@@ -1,7 +1,6 @@
 # YouTube Audio Transcription Tool
 
-This tool downloads audio from YouTube videos and transcribes them using OpenAI's Whisper model locally.
-The output is a text file with the transcription. And you can upload it to chatGPT to extract knowledge out of it.
+This tool automates the process of transcribing YouTube content by downloading videos' audio tracks and converting them to text using OpenAI's Whisper model running locally. The resulting transcriptions are saved as text files, which can then be further analyzed using ChatGPT or other tools.
 
 ## Requirements
 
@@ -48,15 +47,3 @@ The tool supports:
 - Videos with non-ASCII titles (including Chinese characters)
 
 Downloaded audio files are saved in the `audio/` directory, and transcriptions are saved in the `transcripts/` directory.
-
-## Model Sizes
-
-- `tiny`: Fastest, least accurate
-- `base`: Fast, acceptable accuracy
-- `small`: Balanced speed/accuracy
-- `medium`: Good accuracy (default)
-- `large`: Best accuracy, slowest
-
-## Output
-
-The transcription will be saved to `transcription.txt` by default, or to the specified output file. The downloaded audio file will be deleted unless the `--keep-audio` flag is used. 
