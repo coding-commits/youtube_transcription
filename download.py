@@ -5,14 +5,7 @@ import os
 import yt_dlp
 
 
-def validate_url(url):
-    """
-    Validate if the provided URL is a valid YouTube URL.
-    If URL contains a WL (Watch Later) playlist, extract only the video ID.
-    """
-    if not url.startswith(('https://www.youtube.com/', 'https://youtu.be/', 'www.youtube.com/')):
-        raise ValueError("Invalid YouTube URL. Please provide a valid YouTube URL.")
-    
+def youtube_url_processing(url):
     # Check if this is a Watch Later playlist
     parsed_url = urlparse(url)
     query_params = parse_qs(parsed_url.query)
@@ -25,7 +18,6 @@ def validate_url(url):
     return url
 
 def download_audio(url, output_dir='audio', browser=None):
-    """Download audio from YouTube video."""
     os.makedirs(output_dir, exist_ok=True)
             
     ydl_opts = {
@@ -75,27 +67,23 @@ def download_audio(url, output_dir='audio', browser=None):
             return audio_files
     except Exception as e:
         raise Exception(f"Error downloading audio: {str(e)}")
-        
-def download_from_youtube(url, output_dir='audio', browser=None):
-    """
-    Main function to be called from other scripts.
-    Returns a list of downloaded audio file paths.
-    """
-    try:
-        url = validate_url(url)
-        return download_audio(url, output_dir, browser)
-    except Exception as e:
-        print(f"Error in download: {str(e)}")
-        return []
+
 
 def main():
     parser = argparse.ArgumentParser(description='YouTube Video Downloader')
     parser.add_argument('url', help='YouTube video or playlist URL')
     parser.add_argument('--browser', help='Specify the browser to use for cookies')
+    args = parser.parse_args()  # Add this line to parse arguments
+    
     try:
-        audio_files = download_from_youtube(args.url,
-                                          browser=args.browser)
-        print(f"Audio files downloaded: {audio_files}")
+        # Check if URL is a YouTube URL
+        if any(url in args.url for url in ['youtube.com', 'youtu.be']):
+            url = youtube_url_processing(args.url)
+            audio_files = download_audio(url, browser=args.browser)
+            print(f"Audio files downloaded: {audio_files}")
+        elif args.url.startswith("https://b23.tv/") or args.url.startswith("https://www.bilibili.com"):
+            audio_files = download_audio(args.url, browser=args.browser)
+            print(f"Audio files downloaded: {audio_files}")
             
     except Exception as e:
         print(f"Error: {str(e)}")
