@@ -1,3 +1,4 @@
 audio/
 transcripts/
 whisper-env/
+__pycache__/
