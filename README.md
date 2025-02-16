@@ -26,7 +26,7 @@ pip install -r requirements.txt
 
 Basic usage:
 ```bash
-python transcribe.py "https://www.youtube.com/watch?v=VIDEO_ID"
+python youtube_transcribe.py "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
 Advanced options:
@@ -34,15 +34,14 @@ Advanced options:
 python transcribe.py "https://www.youtube.com/watch?v=VIDEO_ID" [OPTIONS]
 
 Options:
-  --model {tiny,base,small,medium,large}  Whisper model size (default: medium)
   --delete-audio                          Delete audio files after transcription
   --browser {chrome,firefox,opera,edge,safari,chromium}
                                          Extract cookies from specified browser
 ```
 
 The tool supports:
-- Single video URLs
-- Playlist URLs (except Watch Later playlists)
+- Youtube single video URLs
+- Youtube playlist URLs (except Watch Later playlists)
 - Videos requiring authentication (via cookies file or browser cookies)
 - Videos with non-ASCII titles (including Chinese characters)
 
