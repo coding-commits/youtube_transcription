@@ -22,7 +22,7 @@ def main():
     # Transcribe the downloaded files
     transcript_files = transcribe_from_files(
         audio_files=audio_files,
-        model_size=args.model_size,
+        model_size='medium',
         delete_after=args.delete_after
     )
 
