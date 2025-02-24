@@ -22,7 +22,7 @@ def validate_cookies_file(cookies_file, browser=None):
     return None, None
 
 
-def transcribe_audios(audio_files, model_size='medium', output_dir='transcripts'):
+def transcribe_audios(audio_files, model_size='medium', output_dir='transcripts', url=None):
     """Transcribe the audio files using Whisper and save the transcriptions to specified directory."""
     print(f"Loading Whisper model: {model_size}")
     model = whisper.load_model(model_size)
@@ -42,10 +42,13 @@ def transcribe_audios(audio_files, model_size='medium', output_dir='transcripts'
             abs_audio_path = os.path.abspath(audio_file)
             print(f"Starting transcription for: {audio_file}")
             
-            result = model.transcribe(abs_audio_path, verbose=False)
+            result = model.transcribe(abs_audio_path, verbose=True)
             
             with open(transcript_file, 'w', encoding='utf-8') as f:
-                f.write(result["text"])
+                if url:
+                    f.write(f"source: {url}\n"+"-"*20+'\n')
+                for segment in result["segments"]:
+                    f.write(segment["text"] + "\n")
             print(f"Transcription saved to: {transcript_file}")
             
         except Exception as e:
@@ -73,13 +76,13 @@ def cleanup(audio_file):
     except Exception as e:
         print(f"Warning: Could not remove temporary file {audio_file}: {str(e)}")
 
-def transcribe_from_files(audio_files, model_size='medium', delete_after=False, output_dir='transcripts'):
+def transcribe_from_files(audio_files, model_size='medium', delete_after=False, output_dir='transcripts', url=None):
     """
     Main function to be called from other scripts.
     Returns a list of transcript file paths.
     """
     try:
-        transcribe_audios(audio_files, model_size, output_dir)
+        transcribe_audios(audio_files, model_size, output_dir, url)
         
         if delete_after:
             for audio_file in audio_files:

@@ -23,7 +23,8 @@ def main():
     transcript_files = transcribe_from_files(
         audio_files=audio_files,
         model_size='medium',
-        delete_after=args.delete_after
+        delete_after=args.delete_after,
+        url = args.url
     )
 
     print(f"Created transcripts: {transcript_files}")
