@@ -17,7 +17,25 @@ def youtube_url_processing(url):
     
     return url
 
-def download_audio(url, output_dir='audio', browser=None):
+def download_audio(url, output_dir='audio', browser=None, sample_rate=None, 
+                  audio_quality='', rewrite=True, max_list_len=50):
+    """Download audio from a video URL.
+    
+    Args:
+        url (str): YouTube or Bilibili video/playlist URL
+        output_dir (str): Directory to save audio files (default: 'audio')
+        browser (str): Browser to use for cookies (default: None)
+        sample_rate (int): Audio sample rate in Hz (default: None)
+        audio_quality (str): Audio quality in kbps (default: '')
+        rewrite (bool): Whether to rewrite existing files (default: True)
+        max_downloads (int): Maximum number of videos to download from playlist (default: 50)
+        
+    Returns:
+        list: Paths to downloaded audio files
+        
+    Raises:
+        Exception: If download fails
+    """
     os.makedirs(output_dir, exist_ok=True)
             
     ydl_opts = {
@@ -25,11 +43,8 @@ def download_audio(url, output_dir='audio', browser=None):
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
-            'preferredquality': '32',
+            'preferredquality': audio_quality
         }],
-        'postprocessor_args': {
-            'ffmpeg': ['-ar', '16000'],  # Arguments for FFmpeg
-        },
         'outtmpl': os.path.join(output_dir, '%(title).25s-%(id).10s.%(ext)s'),
         'progress_hooks': [lambda d: print(f"Downloading: {d['_percent_str']} of {d['_total_bytes_str']}") if d['status'] == 'downloading' else None],
         'cookiesfrombrowser': (browser,) if browser else None,
@@ -37,25 +52,29 @@ def download_audio(url, output_dir='audio', browser=None):
         'windowsfilenames': True,   
         'replace_spaces': True,       
         'ignoreerrors': True,          # Continue on download errors
-        'clean_infojson': True       
+        'clean_infojson': True,
+        'playlistend':max_list_len
     }
+
+    if sample_rate:
+        ydl_opts['postprocessor_args'] = {'ffmpeg': ['-ar', str(sample_rate)]}
     
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(params = ydl_opts) as ydl:
+
             info = ydl.extract_info(url, download=False)
             audio_files = []
             
+
             videos_info = info['entries'] if 'entries' in info else [info]
             
             for video_info in videos_info:
-                # Let yt-dlp handle the filename creation
                 filename = ydl.prepare_filename(video_info)
-                # Replace the extension with mp3 since we're converting
                 filename = os.path.splitext(filename)[0] + '.mp3'
                 print(filename)
                 full_path = os.path.abspath(filename)
                 
-                if os.path.exists(full_path):
+                if os.path.exists(full_path) and not rewrite:
                     print(f"Audio file already exists: {full_path}")
                     audio_files.append(full_path)
                     continue
@@ -73,16 +92,28 @@ def main():
     parser = argparse.ArgumentParser(description='YouTube Video Downloader')
     parser.add_argument('url', help='YouTube video or playlist URL')
     parser.add_argument('--browser', help='Specify the browser to use for cookies')
-    args = parser.parse_args()  # Add this line to parse arguments
+    parser.add_argument('--sample-rate', type=int, default=16000, help='Audio sample rate in Hz (default: 16000)')
+    parser.add_argument('--audio-quality', type=str, default='32', 
+                       help='Audio quality in kbps (default: 32). Common values: 32, 64, 96, 128, 192, 256, 320')
+    parser.add_argument('--no-rewrite', action='store_true', 
+                       help='Do not rewrite existing files (default: False)')
+    parser.add_argument('--max-list-len', type=int, default=50, 
+                       help='Maximum number of videos to download from playlist (default: 50)')
+    args = parser.parse_args()
     
+    max_list_len = args.max_list_len
     try:
         # Check if URL is a YouTube URL
         if any(url in args.url for url in ['youtube.com', 'youtu.be']):
             url = youtube_url_processing(args.url)
-            audio_files = download_audio(url, browser=args.browser)
+            audio_files = download_audio(url, browser=args.browser, sample_rate=args.sample_rate, 
+                                      audio_quality=args.audio_quality, rewrite=not args.no_rewrite,
+                                      max_list_len=max_list_len)
             print(f"Audio files downloaded: {audio_files}")
         elif args.url.startswith("https://b23.tv/") or args.url.startswith("https://www.bilibili.com"):
-            audio_files = download_audio(args.url, browser=args.browser)
+            audio_files = download_audio(args.url, browser=args.browser, sample_rate=args.sample_rate, 
+                                      audio_quality=args.audio_quality, rewrite=not args.no_rewrite,
+                                      max_list_len=max_list_len)
             print(f"Audio files downloaded: {audio_files}")
             
     except Exception as e:

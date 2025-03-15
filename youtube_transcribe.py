@@ -16,7 +16,10 @@ def main():
     # Download videos
     audio_files = download_audio(
         url=args.url,
-        browser=args.browser
+        browser=args.browser,
+        sample_rate=16000,
+        audio_quality=32,
+        rewrite=False
     )
 
     # Transcribe the downloaded files
