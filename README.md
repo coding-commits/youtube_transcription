@@ -24,7 +24,7 @@ pip install -r requirements.txt
 
 ## Usage
 
-Basic usage:
+Downlaod and transcribe:
 ```bash
 python youtube_transcribe.py "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
@@ -37,6 +37,18 @@ Options:
   --delete-audio                          Delete audio files after transcription
   --browser {chrome,firefox,opera,edge,safari,chromium}
                                          Extract cookies from specified browser
+```
+
+
+Downlaod only:
+```bash
+python download.py "https://www.youtube.com/watch?v=VIDEO_ID"
+```
+
+
+Downlaod with low quality for transcription:
+```bash
+python download.py "https://www.youtube.com/watch?v=VIDEO_ID" --audio-quality 32 --sample-rate 16000
 ```
 
 The tool supports:
