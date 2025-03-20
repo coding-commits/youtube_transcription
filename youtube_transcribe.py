@@ -1,6 +1,6 @@
 import argparse
 from download import download_audio
-from transcribe import transcribe_from_files
+from transcribe_from_files import transcribe_from_files
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Download and transcribe YouTube videos')
@@ -24,7 +24,7 @@ def main():
 
     # Transcribe the downloaded files
     transcript_files = transcribe_from_files(
-        audio_files=audio_files,
+        audio_files,
         model_size='medium',
         delete_after=args.delete_after,
         url = args.url
