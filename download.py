@@ -58,6 +58,8 @@ def download_audio(url, output_dir='audio', browser=None, sample_rate=None,
 
     if sample_rate:
         ydl_opts['postprocessor_args'] = {'ffmpeg': ['-ar', str(sample_rate)]}
+    if audio_quality:
+        ydl_opts['postprocessor_args']['preferredquality'] = str(audio_quality)
     
     try:
         with yt_dlp.YoutubeDL(params = ydl_opts) as ydl:
@@ -92,8 +94,8 @@ def main():
     parser = argparse.ArgumentParser(description='YouTube Video Downloader')
     parser.add_argument('url', help='YouTube video or playlist URL')
     parser.add_argument('--browser', help='Specify the browser to use for cookies')
-    parser.add_argument('--sample-rate', type=int, default=16000, help='Audio sample rate in Hz (default: 16000)')
-    parser.add_argument('--audio-quality', type=str, default='32', 
+    parser.add_argument('--sample-rate', type=int, default=None, help='Audio sample rate in Hz (default: 16000)')
+    parser.add_argument('--audio-quality', type=str, default=None, 
                        help='Audio quality in kbps (default: 32). Common values: 32, 64, 96, 128, 192, 256, 320')
     parser.add_argument('--no-rewrite', action='store_true', 
                        help='Do not rewrite existing files (default: False)')
