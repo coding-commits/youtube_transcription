@@ -17,7 +17,7 @@ def youtube_url_processing(url):
     
     return url
 
-def download_audio(url, output_dir='audio', browser=None, sample_rate=None, 
+def download_audio(url, output_dir='audio', browser=None, sampling_rate=None, 
                   audio_quality='', rewrite=True, max_list_len=50):
     """Download audio from a video URL.
     
@@ -25,7 +25,7 @@ def download_audio(url, output_dir='audio', browser=None, sample_rate=None,
         url (str): YouTube or Bilibili video/playlist URL
         output_dir (str): Directory to save audio files (default: 'audio')
         browser (str): Browser to use for cookies (default: None)
-        sample_rate (int): Audio sample rate in Hz (default: None)
+        sampling_rate (int): Audio sampling rate in Hz (default: None)
         audio_quality (str): Audio quality in kbps (default: '')
         rewrite (bool): Whether to rewrite existing files (default: True)
         max_downloads (int): Maximum number of videos to download from playlist (default: 50)
@@ -56,8 +56,8 @@ def download_audio(url, output_dir='audio', browser=None, sample_rate=None,
         'playlistend':max_list_len
     }
 
-    if sample_rate:
-        ydl_opts['postprocessor_args'] = {'ffmpeg': ['-ar', str(sample_rate)]}
+    if sampling_rate:
+        ydl_opts['postprocessor_args'] = {'ffmpeg': ['-ar', str(sampling_rate)]}
     if audio_quality:
         ydl_opts['postprocessor_args']['preferredquality'] = str(audio_quality)
     
@@ -94,7 +94,7 @@ def main():
     parser = argparse.ArgumentParser(description='YouTube Video Downloader')
     parser.add_argument('url', help='YouTube video or playlist URL')
     parser.add_argument('--browser', help='Specify the browser to use for cookies')
-    parser.add_argument('--sample-rate', type=int, default=None, help='Audio sample rate in Hz (default: 16000)')
+    parser.add_argument('--sampling-rate', type=int, default=None, help='Audio sampling rate in Hz (default: 16000)')
     parser.add_argument('--audio-quality', type=str, default=None, 
                        help='Audio quality in kbps (default: 32). Common values: 32, 64, 96, 128, 192, 256, 320')
     parser.add_argument('--no-rewrite', action='store_true', 
@@ -108,12 +108,12 @@ def main():
         # Check if URL is a YouTube URL
         if any(url in args.url for url in ['youtube.com', 'youtu.be']):
             url = youtube_url_processing(args.url)
-            audio_files = download_audio(url, browser=args.browser, sample_rate=args.sample_rate, 
+            audio_files = download_audio(url, browser=args.browser, sampling_rate=args.sampling_rate, 
                                       audio_quality=args.audio_quality, rewrite=not args.no_rewrite,
                                       max_list_len=max_list_len)
             print(f"Audio files downloaded: {audio_files}")
         elif args.url.startswith("https://b23.tv/") or args.url.startswith("https://www.bilibili.com"):
-            audio_files = download_audio(args.url, browser=args.browser, sample_rate=args.sample_rate, 
+            audio_files = download_audio(args.url, browser=args.browser, sampling_rate=args.sampling_rate, 
                                       audio_quality=args.audio_quality, rewrite=not args.no_rewrite,
                                       max_list_len=max_list_len)
             print(f"Audio files downloaded: {audio_files}")

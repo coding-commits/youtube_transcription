@@ -13,16 +13,16 @@ Update 2025-04: You can use this tool for the purpose of [just downloading](#dow
 
 1. Create and activate a virtual environment:
 
-**Windows**
-```bash
-python -m venv whisper-env
-whisper-env\Scripts\activate
-```
-
 **Mac/Linux**
 ```bash
 python -m venv whisper-env
 source whisper-env/bin/activate
+```
+
+**Windows**
+```bash
+python -m venv whisper-env
+whisper-env\Scripts\activate
 ```
 
 2. Install the required packages:
@@ -56,7 +56,7 @@ python download.py "https://www.youtube.com/watch?v=VIDEO_ID"
 
 ## Download with low quality
 ```bash
-python download.py "https://www.youtube.com/watch?v=VIDEO_ID" --audio-quality 32 --sample-rate 16000
+python download.py "https://www.youtube.com/watch?v=VIDEO_ID" --audio-quality 32 --sampling-rate 16000
 ```
 
 The tool supports:
