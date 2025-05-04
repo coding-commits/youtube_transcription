@@ -39,12 +39,12 @@ python youtube_transcribe.py "https://www.youtube.com/watch?v=VIDEO_ID"
 
 Advanced options:
 ```bash
-python transcribe.py "https://www.youtube.com/watch?v=VIDEO_ID" [OPTIONS]
+python youtube_transcribe.py "https://www.youtube.com/watch?v=VIDEO_ID" [OPTIONS]
 
 Options:
-  --delete-audio                          Delete audio files after transcription
   --browser {chrome,firefox,opera,edge,safari,chromium}
-                                         Extract cookies from specified browser
+              Uses cookies from specified browser, for paid content
+  --delete-after                    Delete audio files after transcription
 ```
 
 
