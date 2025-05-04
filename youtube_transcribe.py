@@ -8,6 +8,10 @@ def parse_args():
     parser.add_argument('--browser', help='Specify the browser to use for cookies')
     parser.add_argument('--delete-after', action='store_true',
                         help='Delete audio files after transcription')
+    parser.add_argument('--audio-quality', type=int, default=None,
+                        help='Audio quality in kbps (defaults to original quality)')
+    parser.add_argument('--sampling-rate', type=int, default=None,
+                        help='Audio sampling rate in Hz (defaults to original sampling rate)')
     return parser.parse_args()
 
 def main():
@@ -17,8 +21,8 @@ def main():
     audio_files = download_audio(
         url=args.url,
         browser=args.browser,
-        sample_rate=16000,
-        audio_quality=32,
+        sampling_rate=args.sampling_rate,
+        audio_quality=args.audio_quality,
         rewrite=False
     )
 
