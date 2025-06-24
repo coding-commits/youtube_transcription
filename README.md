@@ -61,7 +61,7 @@ python download.py "https://www.youtube.com/watch?v=VIDEO_ID" --audio-quality 32
 
 ## Transcribe files of audio/videos
 ```bash
-python transcribe_from_files.py --path path_to_local_videos --model large --audio-quality 32 --sampling-rate 16000
+python transcribe_from_files.py --path path_to_local_video_or_audio --model large --audio-quality 32 --sampling-rate 16000
 ```
 
 ## Transcribe a folder of audio/videos
