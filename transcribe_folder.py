@@ -98,6 +98,11 @@ def parse_args():
         help='Directory to save transcript files (default: transcripts)'
     )
     parser.add_argument(
+        '--whisper-prompt',
+        default=None,
+        help='Whisper prompt to use for transcription'
+    )
+    parser.add_argument(
         '--recursive', 
         action='store_true',
         help='Search for files recursively in subdirectories'
@@ -133,7 +138,8 @@ def main():
             files=supported_files,
             model_size=args.model,
             delete_after=args.delete_after,
-            output_dir=args.path + "/transcripts" 
+            output_dir=args.path + "/transcripts",
+            whisper_prompt=args.whisper_prompt
         )
         
         print(f"\nTranscription completed!")

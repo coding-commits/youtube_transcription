@@ -213,7 +213,7 @@ def transcribe_from_files(files, model_size='medium', delete_after=False, output
     
     # Separate files by type
     audio_extensions = ['.mp3', '.wav', '.m4a', '.flac', '.aac', '.ogg']
-    video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv']
+    video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.m4v']
     
     audio_files = []
     video_files = []
@@ -271,6 +271,8 @@ def main():
                         help='Directory containing audio files (default: audio)')
     parser.add_argument('--output-dir', default='transcripts',
                         help='Directory for transcript files (default: transcripts)')
+    parser.add_argument('--whisper-prompt', default=None,
+                        help='Whisper prompt to use for transcription')
     
     args = parser.parse_args()
     
