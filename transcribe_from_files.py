@@ -48,7 +48,7 @@ def transcribe_audios(audio_files, model_size='medium', output_dir='transcripts'
                 if url:
                     f.write(f"source: {url}\n"+"-"*20+'\n')
                 for segment in result["segments"]:
-                    f.write(segment["text"] + "\n")
+                    f.write(segment["text"].strip() + "\n")
             print(f"Transcription saved to: {transcript_file}")
             
         except Exception as e:
