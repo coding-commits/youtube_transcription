@@ -22,12 +22,38 @@ def validate_cookies_file(cookies_file, browser=None):
     return None, None
 
 
-def transcribe_audios(audio_files, model_size='medium', output_dir='transcripts', url=None):
-    """Transcribe the audio files using Whisper and save the transcriptions to specified directory."""
+def transcribe_audios(
+        audio_files, 
+        model_size='medium', 
+        delete_after=False, 
+        output_dir='transcripts', 
+        url=None,
+        whisper_prompt=None,
+    ):
+    """
+    Transcribe audio files using Whisper and return a list of transcript file paths.
+    
+    Args:
+        audio_files (list): List of audio file paths
+        model_size (str): Whisper model size to use
+        delete_after (bool): Whether to delete audio files after transcription
+        output_dir (str): Directory to save transcripts
+        url (str): Source URL for the audio (optional)
+        whisper_prompt (str): Optional prompt for Whisper model
+        
+    Returns:
+        list: Paths to generated transcript files
+    """
+    if not audio_files:
+        print("No audio files provided for transcription")
+        return []
+    
     print(f"Loading Whisper model: {model_size}")
     model = whisper.load_model(model_size)
     
     os.makedirs(output_dir, exist_ok=True)
+    
+    transcript_files = []
     
     for audio_file in audio_files:
         print(f"Processing: {audio_file}")
@@ -37,12 +63,13 @@ def transcribe_audios(audio_files, model_size='medium', output_dir='transcripts'
             
             if os.path.exists(transcript_file):
                 print(f"Transcript already exists: {transcript_file}")
+                transcript_files.append(transcript_file)
                 continue
                 
             abs_audio_path = os.path.abspath(audio_file)
             print(f"Starting transcription for: {audio_file}")
             
-            result = model.transcribe(abs_audio_path, verbose=True)
+            result = model.transcribe(abs_audio_path, verbose=True, prompt=whisper_prompt)
             
             with open(transcript_file, 'w', encoding='utf-8') as f:
                 if url:
@@ -50,9 +77,17 @@ def transcribe_audios(audio_files, model_size='medium', output_dir='transcripts'
                 for segment in result["segments"]:
                     f.write(segment["text"].strip() + "\n")
             print(f"Transcription saved to: {transcript_file}")
+            transcript_files.append(transcript_file)
             
         except Exception as e:
             print(f"Error during transcription of {audio_file}: {str(e)}")
+    
+    # Clean up audio files if requested
+    if delete_after:
+        for audio_file in audio_files:
+            cleanup(audio_file)
+    
+    return transcript_files
 
 def save_transcription(text, audio_filename):
     """Save the transcription to a file."""
@@ -76,41 +111,14 @@ def cleanup(audio_file):
     except Exception as e:
         print(f"Warning: Could not remove temporary file {audio_file}: {str(e)}")
 
-def transcribe_from_audios(audio_files, model_size='medium', delete_after=False, output_dir='transcripts', url=None):
-    """
-    Transcribe audio files using Whisper and return a list of transcript file paths.
-    
-    Args:
-        audio_files (list): List of audio file paths
-        model_size (str): Whisper model size to use
-        delete_after (bool): Whether to delete audio files after transcription
-        output_dir (str): Directory to save transcripts
-        url (str): Source URL for the audio (optional)
-        
-    Returns:
-        list: Paths to generated transcript files
-    """
-    try:
-        transcribe_audios(audio_files, model_size, output_dir, url)
-        
-        if delete_after:
-            for audio_file in audio_files:
-                cleanup(audio_file)
-                
-        transcript_files = []
-        for audio_file in audio_files:
-            base_name = os.path.splitext(os.path.basename(audio_file))[0]
-            transcript_file = os.path.join(output_dir, f"{base_name}.txt")
-            if os.path.exists(transcript_file):
-                transcript_files.append(transcript_file)
-        
-        return transcript_files
-        
-    except Exception as e:
-        print(f"Error in audio transcription: {str(e)}")
-        return []
-
-def transcribe_from_videos(video_files, model_size='medium', delete_after=False, output_dir='transcripts', url=None):
+def transcribe_from_videos(
+        video_files, 
+        model_size='medium', 
+        delete_after=False, 
+        output_dir='transcripts', 
+        url=None,
+        whisper_prompt=None
+    ):
     """
     Extract audio from video files, transcribe using Whisper, and return transcript file paths.
     
@@ -153,12 +161,13 @@ def transcribe_from_videos(video_files, model_size='medium', delete_after=False,
                 print(f"Error extracting audio from {video_file}: {str(e)}")
         
         # Transcribe the extracted audio files
-        transcript_files = transcribe_from_audios(
+        transcript_files = transcribe_audios(
             audio_files=audio_files,
             model_size=model_size,
             delete_after=True,  # Always delete temporary audio files
             output_dir=output_dir,
-            url=url
+            url=url,
+            whisper_prompt=whisper_prompt
         )
         
         # Delete original video files if requested
@@ -179,7 +188,7 @@ def transcribe_from_videos(video_files, model_size='medium', delete_after=False,
         print(f"Error in video transcription: {str(e)}")
         return []
 
-def transcribe_from_files(files, model_size='medium', delete_after=False, output_dir='transcripts', url=None):
+def transcribe_from_files(files, model_size='medium', delete_after=False, output_dir='transcripts', url=None, whisper_prompt=None):
     """
     Main function to be called from other scripts.
     Routes files to appropriate transcription function based on file extension.
@@ -190,6 +199,7 @@ def transcribe_from_files(files, model_size='medium', delete_after=False, output
         delete_after (bool): Whether to delete files after transcription
         output_dir (str): Directory to save transcripts
         url (str): Source URL for the files (optional)
+        whisper_prompt (str): Optional prompt for Whisper model
         
     Returns:
         list: Paths to generated transcript files
@@ -203,7 +213,7 @@ def transcribe_from_files(files, model_size='medium', delete_after=False, output
     
     # Separate files by type
     audio_extensions = ['.mp3', '.wav', '.m4a', '.flac', '.aac', '.ogg']
-    video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv']
+    video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.m4v']
     
     audio_files = []
     video_files = []
@@ -226,12 +236,13 @@ def transcribe_from_files(files, model_size='medium', delete_after=False, output
     
     if audio_files:
         print(f"Processing {len(audio_files)} audio files...")
-        audio_transcripts = transcribe_from_audios(
+        audio_transcripts = transcribe_audios(
             audio_files=audio_files,
             model_size=model_size,
             delete_after=delete_after,
             output_dir=output_dir,
-            url=url
+            url=url,
+            whisper_prompt=whisper_prompt
         )
         transcript_files.extend(audio_transcripts)
     
@@ -242,7 +253,8 @@ def transcribe_from_files(files, model_size='medium', delete_after=False, output
             model_size=model_size,
             delete_after=delete_after,
             output_dir=output_dir,
-            url=url
+            url=url,
+            whisper_prompt=whisper_prompt
         )
         transcript_files.extend(video_transcripts)
     
@@ -259,6 +271,8 @@ def main():
                         help='Directory containing audio files (default: audio)')
     parser.add_argument('--output-dir', default='transcripts',
                         help='Directory for transcript files (default: transcripts)')
+    parser.add_argument('--whisper-prompt', default=None,
+                        help='Whisper prompt to use for transcription')
     
     args = parser.parse_args()
     
