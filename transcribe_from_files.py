@@ -29,6 +29,7 @@ def transcribe_audios(
         output_dir='transcripts', 
         url=None,
         whisper_prompt=None,
+        language='english',
     ):
     """
     Transcribe audio files using Whisper and return a list of transcript file paths.
@@ -40,6 +41,7 @@ def transcribe_audios(
         output_dir (str): Directory to save transcripts
         url (str): Source URL for the audio (optional)
         whisper_prompt (str): Optional prompt for Whisper model
+        language (str): Language code for transcription (default: english)
         
     Returns:
         list: Paths to generated transcript files
@@ -69,7 +71,7 @@ def transcribe_audios(
             abs_audio_path = os.path.abspath(audio_file)
             print(f"Starting transcription for: {audio_file}")
             
-            result = model.transcribe(abs_audio_path, verbose=True, prompt=whisper_prompt)
+            result = model.transcribe(abs_audio_path, verbose=True, prompt=whisper_prompt, language=language)
             
             with open(transcript_file, 'w', encoding='utf-8') as f:
                 if url:
@@ -117,7 +119,8 @@ def transcribe_from_videos(
         delete_after=False, 
         output_dir='transcripts', 
         url=None,
-        whisper_prompt=None
+        whisper_prompt=None,
+        language=None
     ):
     """
     Extract audio from video files, transcribe using Whisper, and return transcript file paths.
@@ -167,7 +170,8 @@ def transcribe_from_videos(
             delete_after=True,  # Always delete temporary audio files
             output_dir=output_dir,
             url=url,
-            whisper_prompt=whisper_prompt
+            whisper_prompt=whisper_prompt,
+            language=language
         )
         
         # Delete original video files if requested
@@ -188,7 +192,7 @@ def transcribe_from_videos(
         print(f"Error in video transcription: {str(e)}")
         return []
 
-def transcribe_from_files(files, model_size='medium', delete_after=False, output_dir='transcripts', url=None, whisper_prompt=None):
+def transcribe_from_files(files, model_size='medium', delete_after=False, output_dir='transcripts', url=None, whisper_prompt=None, language=None):
     """
     Main function to be called from other scripts.
     Routes files to appropriate transcription function based on file extension.
@@ -242,7 +246,8 @@ def transcribe_from_files(files, model_size='medium', delete_after=False, output
             delete_after=delete_after,
             output_dir=output_dir,
             url=url,
-            whisper_prompt=whisper_prompt
+            whisper_prompt=whisper_prompt,
+            language=language
         )
         transcript_files.extend(audio_transcripts)
     
@@ -254,7 +259,8 @@ def transcribe_from_files(files, model_size='medium', delete_after=False, output
             delete_after=delete_after,
             output_dir=output_dir,
             url=url,
-            whisper_prompt=whisper_prompt
+            whisper_prompt=whisper_prompt,
+            language=language
         )
         transcript_files.extend(video_transcripts)
     
