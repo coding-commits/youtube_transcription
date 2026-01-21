@@ -1,6 +1,8 @@
 audio/
+video/
 transcripts/
 whisper-env/
 __pycache__/
 __init__.py
 .DS_Store
+.cache/cookies_edge.txt
