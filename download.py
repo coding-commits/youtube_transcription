@@ -1,9 +1,14 @@
+"""
+source whisper-env/bin/activate
+cd distribute
+python download.py "
+"""
+
 import argparse
 import sys
 from urllib.parse import urlparse, parse_qs
 import os
 import yt_dlp
-
 
 def youtube_url_processing(url):
     # Check if this is a Watch Later playlist
