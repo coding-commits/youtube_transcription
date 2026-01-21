@@ -43,48 +43,76 @@ def download_audio(url, output_dir='audio', browser=None, sampling_rate=None,
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
-            'preferredquality': audio_quality
+            'preferredquality': str(audio_quality) if audio_quality else '128'
         }],
         'outtmpl': os.path.join(output_dir, '%(title).25s-%(id).10s.%(ext)s'),
-        'progress_hooks': [lambda d: print(f"Downloading: {d['_percent_str']} of {d['_total_bytes_str']}") if d['status'] == 'downloading' else None],
+        'progress_hooks': [lambda d: print(f"Downloading: {d.get('_percent_str', '0%')} of {d.get('_total_bytes_str', 'unknown')}") if d.get('status') == 'downloading' else None],
         'cookiesfrombrowser': (browser,) if browser else None,
         'restrictfilenames': False,    # Must be False to preserve Chinese characters
         'windowsfilenames': True,   
         'replace_spaces': True,       
         'ignoreerrors': True,          # Continue on download errors
         'clean_infojson': True,
-        'playlistend':max_list_len
+        'playlistend': max_list_len,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['tv', 'web', 'mweb'],
+            }
+        },
+        'check_formats': True,
+        'js_runtimes': {'node': {}},
+        'remote_components': ['ejs:github'],
     }
 
     if sampling_rate:
         ydl_opts['postprocessor_args'] = {'ffmpeg': ['-ar', str(sampling_rate)]}
-    if audio_quality:
-        ydl_opts['postprocessor_args']['preferredquality'] = str(audio_quality)
     
     try:
         with yt_dlp.YoutubeDL(params = ydl_opts) as ydl:
 
             info = ydl.extract_info(url, download=False)
+            if info is None:
+                raise Exception("Failed to extract video information. This might be due to YouTube blocking the request or invalid cookies. Try updating yt-dlp or checking your browser cookies.")
+                
             audio_files = []
             
-
-            videos_info = info['entries'] if 'entries' in info else [info]
+            # Handle both single video and playlist
+            if 'entries' in info:
+                videos_info = [v for v in info['entries'] if v is not None]
+            else:
+                videos_info = [info]
             
             for video_info in videos_info:
-                filename = ydl.prepare_filename(video_info)
-                filename = os.path.splitext(filename)[0] + '.mp3'
-                print(filename)
-                full_path = os.path.abspath(filename)
-                
-                if os.path.exists(full_path) and not rewrite:
-                    print(f"Audio file already exists: {full_path}")
-                    audio_files.append(full_path)
-                    continue
+                try:
+                    filename = ydl.prepare_filename(video_info)
+                    filename = os.path.splitext(filename)[0] + '.mp3'
+                    print(f"Target filename: {filename}")
+                    full_path = os.path.abspath(filename)
                     
-                print(f"Downloading audio for: {video_info['title']}")
-                ydl.download([video_info['webpage_url']])
-                audio_files.append(full_path)
+                    if os.path.exists(full_path) and not rewrite:
+                        print(f"Audio file already exists: {full_path}")
+                        audio_files.append(full_path)
+                        continue
+                        
+                    print(f"Downloading audio for: {video_info.get('title', 'Unknown Title')}")
+                    # Use the webpage_url or the original url if it's a single video
+                    download_url = video_info.get('webpage_url') or url
+                    ydl.download([download_url])
+                    
+                    if os.path.exists(full_path):
+                        audio_files.append(full_path)
+                    else:
+                        # Sometimes the filename might be slightly different after download/post-processing
+                        # Let's try to find the actual file if full_path doesn't exist
+                        print(f"Warning: Could not find expected file {full_path}")
+                        # You might want to add more robust file discovery here if needed
+                except Exception as ve:
+                    print(f"Error processing video {video_info.get('title', 'unknown')}: {str(ve)}")
+                    continue
             
+            if not audio_files:
+                raise Exception("No audio files were successfully downloaded.")
+                
             return audio_files
     except Exception as e:
         raise Exception(f"Error downloading audio: {str(e)}")
