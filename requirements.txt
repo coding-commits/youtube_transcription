@@ -1,4 +1,4 @@
 git+https://github.com/openai/whisper.git
 yt-dlp
-tqdm 
+tqdm==4.67.1
 whisper

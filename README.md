@@ -3,6 +3,7 @@
 This tool automates the process of transcribing YouTube content by downloading videos' audio tracks and converting them to text using OpenAI's Whisper model running locally. The resulting transcriptions are saved as text files, which can then be further analyzed using ChatGPT or other tools.
 
 Update 2025-04: You can use this tool for the purpose of [just downloading](#download-only) the audio as well.
+Update 2025-04: You can use this tool for the purpose of [just downloading](#download-only) the audio as well.
 
 ## Requirements
 
