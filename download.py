@@ -10,6 +10,15 @@ from urllib.parse import urlparse, parse_qs
 import os
 import yt_dlp
 
+def is_bilibili_url(url: str) -> bool:
+    """Return True if the URL looks like a Bilibili URL (including b23.tv short links)."""
+    try:
+        parsed = urlparse(url)
+        host = (parsed.netloc or "").lower()
+        return host == "b23.tv" or host.endswith(".b23.tv") or host.endswith("bilibili.com")
+    except Exception:
+        return False
+
 def youtube_url_processing(url):
     # Check if this is a Watch Later playlist
     parsed_url = urlparse(url)
@@ -43,8 +52,12 @@ def download_audio(url, output_dir='audio', browser=None, sampling_rate=None,
     """
     os.makedirs(output_dir, exist_ok=True)
             
+    # Use format 30280 for Bilibili (commonly the AAC/m4a audio-only stream).
+    # For other sites, use bestaudio/best.
+    format_selector = '30280' if is_bilibili_url(url) else 'bestaudio/best'
+
     ydl_opts = {
-        'format': 'bestaudio/best',
+        'format': format_selector,
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -64,7 +77,7 @@ def download_audio(url, output_dir='audio', browser=None, sampling_rate=None,
                 'player_client': ['tv', 'web', 'mweb'],
             }
         },
-        'check_formats': True,
+        'check_formats': False,  # Skip format URL checks for faster downloads (especially Bilibili)
         'js_runtimes': {'node': {}},
         'remote_components': ['ejs:github'],
     }
