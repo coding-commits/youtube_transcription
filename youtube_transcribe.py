@@ -1,3 +1,10 @@
+"""
+Downlaod and transcribe:
+```bash
+python youtube_transcribe.py "https://youtu.be/minCtoiRHG8"
+```
+"""
+
 import argparse
 from download import download_audio
 from transcribe_from_files import transcribe_from_files

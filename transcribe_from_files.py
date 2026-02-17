@@ -1,12 +1,18 @@
 import os
 import sys
 import argparse
+import subprocess
+import tempfile
 import whisper
 import yt_dlp
 from tqdm import tqdm
 from urllib.parse import urlparse, parse_qs
 
 OPENAI_MAX_FILE_BYTES = 25 * 1024 * 1024  # 25 MB
+# Chunk duration when downsize+split: mono 64k → ~0.5 MB/min; 20 min ≈ 10 MB (well under 25 MB)
+OPENAI_CHUNK_DURATION_SEC = 20 * 60
+OPENAI_DOWNSIZE_BITRATE = "64k"
+OPENAI_DOWNSIZE_SAMPLE_RATE = 16000
 
 
 def validate_cookies_file(cookies_file, browser=None):
@@ -92,6 +98,57 @@ def transcribe_audios(
     return transcript_files
 
 
+def _get_audio_duration_seconds(path):
+    """Return duration in seconds via ffprobe."""
+    cmd = [
+        "ffprobe", "-v", "error", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", path
+    ]
+    out = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    return float(out.stdout.strip())
+
+
+def _make_openai_safe_chunks(audio_path):
+    """
+    Downsize and split audio into chunks under OPENAI_MAX_FILE_BYTES.
+    Returns (list of temp chunk file paths, temp_dir to remove later).
+    """
+    duration = _get_audio_duration_seconds(audio_path)
+    temp_dir = tempfile.mkdtemp(prefix="openai_chunks_")
+    chunk_paths = []
+    start = 0.0
+    idx = 0
+    while start < duration:
+        end = min(start + OPENAI_CHUNK_DURATION_SEC, duration)
+        out_path = os.path.join(temp_dir, f"chunk_{idx:04d}.mp3")
+        cmd = [
+            "ffmpeg", "-y", "-i", audio_path,
+            "-ss", str(start), "-to", str(end),
+            "-ac", "1", "-ar", str(OPENAI_DOWNSIZE_SAMPLE_RATE),
+            "-b:a", OPENAI_DOWNSIZE_BITRATE,
+            "-vn", out_path
+        ]
+        subprocess.run(cmd, check=True, capture_output=True)
+        if os.path.getsize(out_path) > OPENAI_MAX_FILE_BYTES:
+            # Rare: chunk still too big; shorten and re-encode
+            half = (start + end) / 2
+            os.remove(out_path)
+            out_path = os.path.join(temp_dir, f"chunk_{idx:04d}.mp3")
+            subprocess.run([
+                "ffmpeg", "-y", "-i", audio_path,
+                "-ss", str(start), "-to", str(half),
+                "-ac", "1", "-ar", str(OPENAI_DOWNSIZE_SAMPLE_RATE),
+                "-b:a", OPENAI_DOWNSIZE_BITRATE, "-vn", out_path
+            ], check=True, capture_output=True)
+            chunk_paths.append(out_path)
+            start = half
+        else:
+            chunk_paths.append(out_path)
+            start = end
+        idx += 1
+    return chunk_paths, temp_dir
+
+
 def transcribe_audios_openai(
         audio_files,
         delete_after=False,
@@ -127,19 +184,42 @@ def transcribe_audios_openai(
                 transcript_files.append(transcript_file)
                 continue
             size = os.path.getsize(audio_file)
-            if size > OPENAI_MAX_FILE_BYTES:
-                raise ValueError(
-                    f"File {audio_file} is {size / (1024*1024):.1f} MB. "
-                    f"OpenAI API accepts at most 25 MB. Use shorter audio or lower quality."
-                )
             abs_audio_path = os.path.abspath(audio_file)
-            with open(abs_audio_path, "rb") as f:
-                response = client.audio.transcriptions.create(
-                    model="gpt-4o-transcribe",
-                    file=f,
-                    response_format="text",
-                )
-            text = response if isinstance(response, str) else getattr(response, "text", str(response))
+            if size > OPENAI_MAX_FILE_BYTES:
+                # Downsize and chop into shorter files, then transcribe each and concatenate
+                print(f"File over 25 MB; downsize and split into chunks: {audio_file}")
+                chunk_paths, temp_dir = _make_openai_safe_chunks(abs_audio_path)
+                try:
+                    parts = []
+                    for i, chunk_path in enumerate(chunk_paths):
+                        print(f"Transcribing chunk {i + 1}/{len(chunk_paths)}: {chunk_path}")
+                        with open(chunk_path, "rb") as f:
+                            response = client.audio.transcriptions.create(
+                                model="gpt-4o-transcribe",
+                                file=f,
+                                response_format="text",
+                            )
+                        part = response if isinstance(response, str) else getattr(response, "text", str(response))
+                        parts.append(part)
+                    text = "\n".join(parts)
+                finally:
+                    for p in chunk_paths:
+                        try:
+                            os.remove(p)
+                        except OSError:
+                            pass
+                    try:
+                        os.rmdir(temp_dir)
+                    except OSError:
+                        pass
+            else:
+                with open(abs_audio_path, "rb") as f:
+                    response = client.audio.transcriptions.create(
+                        model="gpt-4o-transcribe",
+                        file=f,
+                        response_format="text",
+                    )
+                text = response if isinstance(response, str) else getattr(response, "text", str(response))
             with open(transcript_file, "w", encoding="utf-8") as f:
                 if url:
                     f.write(f"source: {url}\n" + "-" * 20 + "\n")

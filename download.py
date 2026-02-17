@@ -32,7 +32,6 @@ def youtube_url_processing(url):
     return url
 
 def download_audio(url, output_dir='audio', browser=None, sampling_rate=None, 
-def download_audio(url, output_dir='audio', browser=None, sampling_rate=None, 
                   audio_quality='', rewrite=True, max_list_len=50):
     """Download audio from a video URL.
     
