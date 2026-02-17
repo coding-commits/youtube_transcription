@@ -12,6 +12,9 @@ def parse_args():
                         help='Audio quality in kbps (defaults to original quality)')
     parser.add_argument('--sampling-rate', type=int, default=None,
                         help='Audio sampling rate in Hz (defaults to original sampling rate)')
+    parser.add_argument('--model', choices=['tiny', 'base', 'small', 'medium', 'large', '4o'],
+                        default='4o',
+                        help='Transcription model: 4o (OpenAI gpt-4o-transcribe) or Whisper size (default: 4o)')
     return parser.parse_args()
 
 def main():
@@ -29,9 +32,9 @@ def main():
     # Transcribe the downloaded files
     transcript_files = transcribe_from_files(
         audio_files,
-        model_size='medium',
+        model_size=args.model,
         delete_after=args.delete_after,
-        url = args.url
+        url=args.url
     )
 
     print(f"Created transcripts: {transcript_files}")
