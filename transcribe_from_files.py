@@ -169,9 +169,12 @@ def transcribe_audios_openai(
         )
     try:
         from openai import OpenAI
+        import httpx
     except ImportError:
         raise ImportError("Using model_size='4o' requires the openai package. Install with: pip install openai")
-    client = OpenAI(api_key=api_key)
+    # Use explicit httpx client to avoid OpenAI lib passing 'proxies' to httpx 0.28+ (TypeError)
+    http_client = httpx.Client(trust_env=True)
+    client = OpenAI(api_key=api_key, http_client=http_client)
     os.makedirs(output_dir, exist_ok=True)
     transcript_files = []
     for audio_file in audio_files:
