@@ -12,6 +12,8 @@ from urllib.parse import parse_qs, urlparse
 
 import yt_dlp
 
+from browser_cookies import ensure_browser_cookies_readable
+
 
 def is_bilibili_url(url: str) -> bool:
     """Return True if the URL looks like a Bilibili URL (including b23.tv short links)."""
@@ -60,6 +62,7 @@ def download_video(
         List of absolute paths to downloaded video files.
     """
     os.makedirs(output_dir, exist_ok=True)
+    ensure_browser_cookies_readable(browser)
 
     # Sensible default for full video downloads.
     # - Prefer separate video+audio when possible, fall back to 'best'.

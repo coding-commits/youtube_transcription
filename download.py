@@ -11,6 +11,8 @@ from urllib.parse import urlparse, parse_qs
 import os
 import yt_dlp
 
+from browser_cookies import ensure_browser_cookies_readable
+
 def is_bilibili_url(url: str) -> bool:
     """Return True if the URL looks like a Bilibili URL (including b23.tv short links)."""
     try:
@@ -31,35 +33,6 @@ def youtube_url_processing(url):
         return f"https://www.youtube.com/watch?v={video_id}"
     
     return url
-
-def _chrome_cookie_dir():
-    return os.path.expanduser('~/Library/Application Support/Google/Chrome')
-
-
-def ensure_browser_cookies_readable(browser):
-    """Fail early when macOS hides the Chrome cookie database.
-
-    yt-dlp walks that folder and, on PermissionError, reports that the
-    cookies database is missing.
-    """
-    if not browser or browser.lower() != 'chrome' or sys.platform != 'darwin':
-        return
-    cookie_dir = _chrome_cookie_dir()
-    try:
-        os.listdir(cookie_dir)
-    except FileNotFoundError:
-        raise Exception(
-            f"Chrome cookie folder not found: {cookie_dir}. "
-            "Install Chrome or pass a browser that is installed."
-        )
-    except PermissionError:
-        raise Exception(
-            "macOS blocked access to Chrome cookies "
-            f"({cookie_dir}). Enable Full Disk Access for this terminal "
-            "(System Settings → Privacy & Security → Full Disk Access), "
-            "then quit and reopen the terminal and run the command again."
-        )
-
 
 def download_audio(url, output_dir='audio', browser=None, sampling_rate=None, 
                   audio_quality='', rewrite=True, max_list_len=50):
