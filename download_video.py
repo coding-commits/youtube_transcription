@@ -40,7 +40,7 @@ def download_video(
     url: str,
     output_dir: str = "video",
     browser: str | None = None,
-    rewrite: bool = True,
+    overwrite: bool = False,
     max_list_len: int = 50,
     video_format: str | None = None,
     merge_output_format: str = "mp4",
@@ -51,7 +51,7 @@ def download_video(
         url: YouTube or Bilibili video/playlist URL.
         output_dir: Directory to save videos (default: 'video').
         browser: Browser name to use for cookies via yt-dlp (default: None).
-        rewrite: Whether to rewrite existing files (default: True).
+        overwrite: If True, download again even when file exists (default: False).
         max_list_len: Maximum number of videos to download from playlist (default: 50).
         video_format: Optional yt-dlp format selector override.
         merge_output_format: Container format for merged output (default: 'mp4').
@@ -89,7 +89,9 @@ def download_video(
                 "player_client": ["tv", "web", "mweb"],
             }
         },
-        "check_formats": True,
+        # When not overwriting, disable format checking so we can get video title/metadata
+        # and then check the filesystem for existing file (no yt_dlp needed for existence check).
+        "check_formats": overwrite,
         "js_runtimes": {"node": {}},
         "remote_components": ["ejs:github"],
     }
@@ -111,10 +113,15 @@ def download_video(
                 try:
                     filename = ydl.prepare_filename(video_info)
                     full_path = os.path.abspath(filename)
-
-                    if os.path.exists(full_path) and not rewrite:
-                        print(f"Video file already exists: {full_path}")
-                        downloaded_files.append(full_path)
+                    base_no_ext = os.path.splitext(full_path)[0]
+                    candidate_paths = [
+                        full_path,
+                        base_no_ext + "." + merge_output_format,
+                    ]
+                    existing = next((p for p in candidate_paths if os.path.exists(p)), None)
+                    if existing and not overwrite:
+                        print(f"Video file already exists: {existing}")
+                        downloaded_files.append(os.path.abspath(existing))
                         continue
 
                     print(f"Downloading video for: {video_info.get('title', 'Unknown Title')}")
@@ -122,7 +129,6 @@ def download_video(
                     ydl.download([download_url])
 
                     # After merge, the extension can change; try to locate the merged output.
-                    base_no_ext = os.path.splitext(full_path)[0]
                     candidate_paths = [
                         full_path,
                         base_no_ext + "." + merge_output_format,
@@ -160,9 +166,9 @@ def main() -> None:
         help="Container format for merged output (default: mp4)",
     )
     parser.add_argument(
-        "--no-rewrite",
+        "--overwrite",
         action="store_true",
-        help="Do not rewrite existing files (default: False)",
+        help="Re-download and overwrite if video file already exists (default: skip existing)",
     )
     parser.add_argument(
         "--max-list-len",
@@ -186,7 +192,7 @@ def main() -> None:
             url=url,
             output_dir=args.output_dir,
             browser=args.browser,
-            rewrite=not args.no_rewrite,
+            overwrite=args.overwrite,
             max_list_len=args.max_list_len,
             video_format=args.video_format,
             merge_output_format=args.merge_output_format,

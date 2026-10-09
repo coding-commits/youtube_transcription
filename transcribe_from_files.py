@@ -1,10 +1,18 @@
 import os
 import sys
 import argparse
+import subprocess
+import tempfile
 import whisper
 import yt_dlp
 from tqdm import tqdm
 from urllib.parse import urlparse, parse_qs
+
+OPENAI_MAX_FILE_BYTES = 25 * 1024 * 1024  # 25 MB
+# Chunk duration when downsize+split: mono 64k → ~0.5 MB/min; 20 min ≈ 10 MB (well under 25 MB)
+OPENAI_CHUNK_DURATION_SEC = 20 * 60
+OPENAI_DOWNSIZE_BITRATE = "64k"
+OPENAI_DOWNSIZE_SAMPLE_RATE = 16000
 
 
 def validate_cookies_file(cookies_file, browser=None):
@@ -89,6 +97,146 @@ def transcribe_audios(
     
     return transcript_files
 
+
+def _get_audio_duration_seconds(path):
+    """Return duration in seconds via ffprobe."""
+    cmd = [
+        "ffprobe", "-v", "error", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", path
+    ]
+    out = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    return float(out.stdout.strip())
+
+
+def _make_openai_safe_chunks(audio_path):
+    """
+    Downsize and split audio into chunks under OPENAI_MAX_FILE_BYTES.
+    Returns (list of temp chunk file paths, temp_dir to remove later).
+    """
+    duration = _get_audio_duration_seconds(audio_path)
+    temp_dir = tempfile.mkdtemp(prefix="openai_chunks_")
+    chunk_paths = []
+    start = 0.0
+    idx = 0
+    while start < duration:
+        end = min(start + OPENAI_CHUNK_DURATION_SEC, duration)
+        out_path = os.path.join(temp_dir, f"chunk_{idx:04d}.mp3")
+        cmd = [
+            "ffmpeg", "-y", "-i", audio_path,
+            "-ss", str(start), "-to", str(end),
+            "-ac", "1", "-ar", str(OPENAI_DOWNSIZE_SAMPLE_RATE),
+            "-b:a", OPENAI_DOWNSIZE_BITRATE,
+            "-vn", out_path
+        ]
+        subprocess.run(cmd, check=True, capture_output=True)
+        if os.path.getsize(out_path) > OPENAI_MAX_FILE_BYTES:
+            # Rare: chunk still too big; shorten and re-encode
+            half = (start + end) / 2
+            os.remove(out_path)
+            out_path = os.path.join(temp_dir, f"chunk_{idx:04d}.mp3")
+            subprocess.run([
+                "ffmpeg", "-y", "-i", audio_path,
+                "-ss", str(start), "-to", str(half),
+                "-ac", "1", "-ar", str(OPENAI_DOWNSIZE_SAMPLE_RATE),
+                "-b:a", OPENAI_DOWNSIZE_BITRATE, "-vn", out_path
+            ], check=True, capture_output=True)
+            chunk_paths.append(out_path)
+            start = half
+        else:
+            chunk_paths.append(out_path)
+            start = end
+        idx += 1
+    return chunk_paths, temp_dir
+
+
+def transcribe_audios_openai(
+        audio_files,
+        delete_after=False,
+        output_dir='transcripts',
+        url=None,
+):
+    """
+    Transcribe audio files using OpenAI gpt-4o-transcribe (API key from OPENAI_API_KEY env).
+    """
+    if not audio_files:
+        print("No audio files provided for transcription")
+        return []
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "OPENAI_API_KEY environment variable is not set. "
+            "Set it to your OpenAI API key to use model_size='4o'."
+        )
+    try:
+        from openai import OpenAI
+        import httpx
+    except ImportError:
+        raise ImportError("Using model_size='4o' requires the openai package. Install with: pip install openai")
+    # Use explicit httpx client to avoid OpenAI lib passing 'proxies' to httpx 0.28+ (TypeError)
+    http_client = httpx.Client(trust_env=True)
+    client = OpenAI(api_key=api_key, http_client=http_client)
+    os.makedirs(output_dir, exist_ok=True)
+    transcript_files = []
+    for audio_file in audio_files:
+        print(f"Processing: {audio_file}")
+        try:
+            base_name = os.path.splitext(os.path.basename(audio_file))[0]
+            transcript_file = os.path.join(output_dir, f"{base_name}.txt")
+            if os.path.exists(transcript_file):
+                print(f"Transcript already exists: {transcript_file}")
+                transcript_files.append(transcript_file)
+                continue
+            size = os.path.getsize(audio_file)
+            abs_audio_path = os.path.abspath(audio_file)
+            if size > OPENAI_MAX_FILE_BYTES:
+                # Downsize and chop into shorter files, then transcribe each and concatenate
+                print(f"File over 25 MB; downsize and split into chunks: {audio_file}")
+                chunk_paths, temp_dir = _make_openai_safe_chunks(abs_audio_path)
+                try:
+                    parts = []
+                    for i, chunk_path in enumerate(chunk_paths):
+                        print(f"Transcribing chunk {i + 1}/{len(chunk_paths)}: {chunk_path}")
+                        with open(chunk_path, "rb") as f:
+                            response = client.audio.transcriptions.create(
+                                model="gpt-4o-transcribe",
+                                file=f,
+                                response_format="text",
+                            )
+                        part = response if isinstance(response, str) else getattr(response, "text", str(response))
+                        parts.append(part)
+                    text = "\n".join(parts)
+                finally:
+                    for p in chunk_paths:
+                        try:
+                            os.remove(p)
+                        except OSError:
+                            pass
+                    try:
+                        os.rmdir(temp_dir)
+                    except OSError:
+                        pass
+            else:
+                with open(abs_audio_path, "rb") as f:
+                    response = client.audio.transcriptions.create(
+                        model="gpt-4o-transcribe",
+                        file=f,
+                        response_format="text",
+                    )
+                text = response if isinstance(response, str) else getattr(response, "text", str(response))
+            with open(transcript_file, "w", encoding="utf-8") as f:
+                if url:
+                    f.write(f"source: {url}\n" + "-" * 20 + "\n")
+                f.write(text)
+            print(f"Transcription saved to: {transcript_file}")
+            transcript_files.append(transcript_file)
+        except Exception as e:
+            print(f"Error during transcription of {audio_file}: {str(e)}")
+    if delete_after:
+        for audio_file in audio_files:
+            cleanup(audio_file)
+    return transcript_files
+
+
 def save_transcription(text, audio_filename):
     """Save the transcription to a file."""
     # Create transcripts directory if it doesn't exist
@@ -161,14 +309,22 @@ def transcribe_from_videos(
                 print(f"Error extracting audio from {video_file}: {str(e)}")
         
         # Transcribe the extracted audio files
-        transcript_files = transcribe_audios(
-            audio_files=audio_files,
-            model_size=model_size,
-            delete_after=True,  # Always delete temporary audio files
-            output_dir=output_dir,
-            url=url,
-            whisper_prompt=whisper_prompt
-        )
+        if model_size == "4o":
+            transcript_files = transcribe_audios_openai(
+                audio_files=audio_files,
+                delete_after=True,
+                output_dir=output_dir,
+                url=url,
+            )
+        else:
+            transcript_files = transcribe_audios(
+                audio_files=audio_files,
+                model_size=model_size,
+                delete_after=True,  # Always delete temporary audio files
+                output_dir=output_dir,
+                url=url,
+                whisper_prompt=whisper_prompt
+            )
         
         # Delete original video files if requested
         if delete_after:
@@ -188,18 +344,18 @@ def transcribe_from_videos(
         print(f"Error in video transcription: {str(e)}")
         return []
 
-def transcribe_from_files(files, model_size='medium', delete_after=False, output_dir='transcripts', url=None, whisper_prompt=None):
+def transcribe_from_files(files, model_size='4o', delete_after=False, output_dir='transcripts', url=None, whisper_prompt=None):
     """
     Main function to be called from other scripts.
     Routes files to appropriate transcription function based on file extension.
     
     Args:
         files (list): List of file paths (audio or video)
-        model_size (str): Whisper model size to use
+        model_size (str): '4o' for OpenAI gpt-4o-transcribe, or Whisper size: tiny, base, small, medium, large
         delete_after (bool): Whether to delete files after transcription
         output_dir (str): Directory to save transcripts
         url (str): Source URL for the files (optional)
-        whisper_prompt (str): Optional prompt for Whisper model
+        whisper_prompt (str): Optional prompt for Whisper model (ignored when model_size='4o')
         
     Returns:
         list: Paths to generated transcript files
@@ -236,14 +392,22 @@ def transcribe_from_files(files, model_size='medium', delete_after=False, output
     
     if audio_files:
         print(f"Processing {len(audio_files)} audio files...")
-        audio_transcripts = transcribe_audios(
-            audio_files=audio_files,
-            model_size=model_size,
-            delete_after=delete_after,
-            output_dir=output_dir,
-            url=url,
-            whisper_prompt=whisper_prompt
-        )
+        if model_size == "4o":
+            audio_transcripts = transcribe_audios_openai(
+                audio_files=audio_files,
+                delete_after=delete_after,
+                output_dir=output_dir,
+                url=url,
+            )
+        else:
+            audio_transcripts = transcribe_audios(
+                audio_files=audio_files,
+                model_size=model_size,
+                delete_after=delete_after,
+                output_dir=output_dir,
+                url=url,
+                whisper_prompt=whisper_prompt
+            )
         transcript_files.extend(audio_transcripts)
     
     if video_files:
@@ -263,8 +427,8 @@ def transcribe_from_files(files, model_size='medium', delete_after=False, output
 def main():
     parser = argparse.ArgumentParser(description='Audio Transcription Tool')
     parser.add_argument('files', nargs='+', help='Paths to audio or video files')
-    parser.add_argument('--model', choices=['tiny', 'base', 'small', 'medium', 'large'], 
-                        default='medium', help='Whisper model size')
+    parser.add_argument('--model', choices=['tiny', 'base', 'small', 'medium', 'large', '4o'],
+                        default='4o', help='Transcription model: 4o (OpenAI gpt-4o-transcribe) or Whisper size')
     parser.add_argument('--delete-audio', action='store_true', 
                         help='Delete audio files after transcription')
     parser.add_argument('--audio-dir', default='audio',

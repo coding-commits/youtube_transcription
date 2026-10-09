@@ -1,7 +1,8 @@
 """
+downloads only audio
 source whisper-env/bin/activate
 cd distribute
-python download.py "
+python download.py "https://www.youtube.com/watch?v=..."
 """
 
 import argparse
@@ -31,7 +32,35 @@ def youtube_url_processing(url):
     
     return url
 
-def download_audio(url, output_dir='audio', browser=None, sampling_rate=None, 
+def _chrome_cookie_dir():
+    return os.path.expanduser('~/Library/Application Support/Google/Chrome')
+
+
+def ensure_browser_cookies_readable(browser):
+    """Fail early when macOS hides the Chrome cookie database.
+
+    yt-dlp walks that folder and, on PermissionError, reports that the
+    cookies database is missing.
+    """
+    if not browser or browser.lower() != 'chrome' or sys.platform != 'darwin':
+        return
+    cookie_dir = _chrome_cookie_dir()
+    try:
+        os.listdir(cookie_dir)
+    except FileNotFoundError:
+        raise Exception(
+            f"Chrome cookie folder not found: {cookie_dir}. "
+            "Install Chrome or pass a browser that is installed."
+        )
+    except PermissionError:
+        raise Exception(
+            "macOS blocked access to Chrome cookies "
+            f"({cookie_dir}). Enable Full Disk Access for this terminal "
+            "(System Settings → Privacy & Security → Full Disk Access), "
+            "then quit and reopen the terminal and run the command again."
+        )
+
+
 def download_audio(url, output_dir='audio', browser=None, sampling_rate=None, 
                   audio_quality='', rewrite=True, max_list_len=50):
     """Download audio from a video URL.
@@ -52,6 +81,7 @@ def download_audio(url, output_dir='audio', browser=None, sampling_rate=None,
         Exception: If download fails
     """
     os.makedirs(output_dir, exist_ok=True)
+    ensure_browser_cookies_readable(browser)
             
     # Use format 30280 for Bilibili (commonly the AAC/m4a audio-only stream).
     # For other sites, use bestaudio/best.
@@ -141,9 +171,9 @@ def main():
     parser = argparse.ArgumentParser(description='YouTube Video Downloader')
     parser.add_argument('url', help='YouTube video or playlist URL')
     parser.add_argument('--browser', help='Specify the browser to use for cookies')
-    parser.add_argument('--sampling-rate', type=int, default=None, help='Audio sampling rate in Hz (default: 16000)')
+    parser.add_argument('--sampling-rate', type=int, default=None, help='Audio sampling rate in Hz (default: original sampling rate)')
     parser.add_argument('--audio-quality', type=str, default=None, 
-                       help='Audio quality in kbps (default: 32). Common values: 32, 64, 96, 128, 192, 256, 320')
+                       help='Audio quality in kbps (default: original quality). Common values: 32, 64, 96, 128, 192, 256, 320')
     parser.add_argument('--no-rewrite', action='store_true', 
                        help='Do not rewrite existing files (default: False)')
     parser.add_argument('--max-list-len', type=int, default=50, 

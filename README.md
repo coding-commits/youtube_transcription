@@ -53,6 +53,10 @@ Options:
 python download.py "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
+## Download only
+```bash
+python download_video.py "https://www.youtube.com/watch?v=VIDEO_ID"
+```
 
 ## Download with low quality
 ```bash

@@ -70,10 +70,10 @@ def parse_args():
         help='Path to folder containing audio/video files'
     )
     parser.add_argument(
-        '--model', 
-        choices=['tiny', 'base', 'small', 'medium', 'large'],
+        '--model',
+        choices=['tiny', 'base', 'small', 'medium', 'large', '4o'],
         default='large',
-        help='Whisper model size to use (default: large)'
+        help='Transcription model: 4o (OpenAI gpt-4o-transcribe) or Whisper size (default: large)'
     )
     parser.add_argument(
         '--audio-quality', 
